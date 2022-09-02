@@ -10,45 +10,96 @@ BP_DIR=$(cd $(dirname ${0:-}); cd ..; pwd)
 source "$BP_DIR/bin/util/common.sh"
 
 ### Declare local variables
-
-declare project_name
+declare project_name required_files_exist
 
 # Get project name
 project_name="$(get_project_name $1)"
 
-if [[ -f "$1/$project_name.csproj" && -f "$1/Program.cs" ]]; then
-	declare herokuos_version framework_version
-	
-	# Get OS version
-	herokuos_version=$(get_linux_platform_version)
+if [[ -f "$1/$project_name.csproj" ]]; then
+	### Declare local variables
+	declare framework_version
 	
 	# Get application framework verson
 	framework_version=$(get_framework_version $1)
 	
-	if  [[ $(awk 'BEGIN {print ("'$herokuos_version'" >= "'16.04'")}') -eq 1 ]] && [[ $(awk 'BEGIN {print ("'$framework_version'" >= "'2.1'")}') -eq 1 ]]; then
-		echo "ASP.NET Core" && exit 0
+	if  [[ ! -f "$1/$Startup.cs" ]] && [[ $(awk 'BEGIN {print ("'$framework_version'" <= "'3.1'")}') -eq 1 ]]; then
+		required_files_exist=false
+	elif [[ ! -f "$1/$Program.cs" ]]; then
+		required_files_exist=false
 	else
-		if [[ $(awk 'BEGIN {print ("'$herokuos_version'" < "'16.04'")}') -eq 1 ]]; then
-			error <<-EOF
-				Ubuntu $herokuos_version is not supported by .NET Core $framework_version.
+		### Declare local variables
+		declare herokuos_version
+		
+		# Get OS version
+		herokuos_version=$(get_linux_platform_version)
+	
+		if  [[ $(awk 'BEGIN {print ("'$herokuos_version'" >= "'16.04'")}') -eq 1 ]] && [[ $(awk 'BEGIN {print ("'$framework_version'" >= "'2.1'")}') -eq 1 ]]; then
+			if [[ $(awk 'BEGIN {print ("'$framework_version'" >= "'2.1'")}') -eq 1 ]] && [[ $(awk 'BEGIN {print ("'$framework_version'" < "'3.1'")}') -eq 1 ]]; then
+				if [[ $(awk 'BEGIN {print ("'$herokuos_version'" >= "'16.04'")}') -eq 1 ]] && [[ $(awk 'BEGIN {print ("'$herokuos_version'" <= "'20.04'")}') -eq 1 ]]; then
+					echo "ASP.NET Core" && exit 0
+				else
+					error <<-EOF
+						Ubuntu $herokuos_version is not supported by .NET Core $framework_version.
 
-				Supported OS versions:
-				Ubuntu(19.04, 18.04, 16.04)
+						To check the supported OS versions and for more information, refer to the following documentation:
+						https://github.com/dotnet/core/blob/master/release-notes/$framework_version/$framework_version-supported-os.md
+					EOF
+				fi
+			elif [[ $(awk 'BEGIN {print ("'$framework_version'" >= "'3.1'")}') -eq 1 ]] && [[ $(awk 'BEGIN {print ("'$framework_version'" < "'6.0'")}') -eq 1 ]]; then
+				if [[ $(awk 'BEGIN {print ("'$herokuos_version'" >= "'18.04'")}') -eq 1 ]] && [[ $(awk 'BEGIN {print ("'$herokuos_version'" <= "'20.04'")}') -eq 1 ]]; then
+					echo "ASP.NET Core" && exit 0
+				else
+					error <<-EOF
+						Ubuntu $herokuos_version is not supported by .NET Core $framework_version.
 
-				For more information, refer to the following documentation:
-				https://github.com/dotnet/core/blob/master/release-notes/$framework_version/$framework_version-supported-os.md
-			EOF
+						To check the supported OS versions and for more information, refer to the following documentation:
+						https://github.com/dotnet/core/blob/master/release-notes/$framework_version/$framework_version-supported-os.md
+					EOF
+				fi
+			fi
+			elif [[ $(awk 'BEGIN {print ("'$framework_version'" >= "'6.0'")}') -eq 1 ]]; then
+				if [[ $(awk 'BEGIN {print ("'$herokuos_version'" >= "'20.04'")}') -eq 1 ]]; then
+					echo "ASP.NET Core" && exit 0
+				else
+					error <<-EOF
+						Ubuntu $herokuos_version is not supported by .NET Core $framework_version.
+
+						To check the supported OS versions and for more information, refer to the following documentation:
+						https://github.com/dotnet/core/blob/master/release-notes/$framework_version/supported-os.md
+					EOF
+				fi
+			else
+				error <<-EOF
+					Ubuntu $herokuos_version is not supported by .NET Core $framework_version.
+
+					To check the supported OS versions and for more information, refer to the following documentation:	
+					https://github.com/dotnet/core/blob/master/release-notes/$framework_version/$framework_version-supported-os.md
+				EOF
+			fi
 		else
-			error <<-EOF
-				The .NET Core framework version $framework_version is not supported by this buildpack!
+			if [[ $(awk 'BEGIN {print ("'$herokuos_version'" < "'16.04'")}') -eq 1 ]]; then
+				error <<-EOF
+					Ubuntu $herokuos_version is not supported by .NET Core $framework_version.
 
-				This buildpack supports .NET Core framework version from 2.1 and higher.
-			EOF
+					To check the supported OS versions and for more information, refer to the following documentation:
+					https://github.com/dotnet/core/blob/master/release-notes/$framework_version/$framework_version-supported-os.md
+				EOF
+			else
+				error <<-EOF
+					The .NET Core framework version $framework_version is not supported by this buildpack!
+
+					This buildpack supports .NET Core framework version from 2.1 and higher.
+				EOF
+			fi
 		fi
 	fi
 else
+	required_files_exist=false
+fi
+
+if [[ required_files_exist == false ]]; then
 	if [[ ${#project_name} -eq 0 ]]; then
-		project_name="*"
+		project_name="*"  
 	fi
 	error <<-EOF
 		Application not supported by this buildpack!
@@ -61,7 +112,10 @@ else
 
 		If you are trying to deploy an ASP.NET Core application, ensure that ensure that
 		these files (${project_name}.csproj, Startup.cs and Program.cs) are present at
-		the top level directory. 
+		the top level directory.
+		
+		Note:-
+		From dotnet6.0 and higher versions, The Startup.cs file removed by Microsoft and all configurations moved to The Program.cs file. 
 
 		This directory has the following files:
 		$(ls -1p "$1")
