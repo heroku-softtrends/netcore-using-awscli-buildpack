@@ -22,7 +22,7 @@ BP_DIR=$(cd $(dirname ${0:-}); cd ..; pwd)
 # shellcheck source=util/common.sh
 source "$BP_DIR/bin/util/common.sh"
 # shellcheck source=util/awscli-install.sh
-source "$BP_DIR/bin/util/awscli.sh"
+source "$BP_DIR/bin/util/awscli-install.sh"
 # shellcheck source=util/apt_dpkg_install.sh
 source "$BP_DIR/bin/util/apt_dpkg_install.sh"
 
