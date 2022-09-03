@@ -14,6 +14,8 @@ declare project_name required_files_exist
 
 # Get project name
 project_name="$(get_project_name $1)"
+print "project name: ${project_name}"
+
 
 if [[ -f "$1/$project_name.csproj" ]]; then
 	### Declare local variables
@@ -21,6 +23,7 @@ if [[ -f "$1/$project_name.csproj" ]]; then
 	
 	# Get application framework verson
 	framework_version=$(get_framework_version $1)
+	print "netcore version: ${framework_version}"
 	
 	if  [[ ! -f "$1/$Startup.cs" ]] && [[ $(awk 'BEGIN {print ("'$framework_version'" <= "'3.1'")}') -eq 1 ]]; then
 		required_files_exist=false
@@ -32,6 +35,7 @@ if [[ -f "$1/$project_name.csproj" ]]; then
 		
 		# Get OS version
 		herokuos_version=$(get_linux_platform_version)
+		print "heroku version: ${herokuos_version}"
 	
 		if  [[ $(awk 'BEGIN {print ("'$herokuos_version'" >= "'16.04'")}') -eq 1 ]] && [[ $(awk 'BEGIN {print ("'$framework_version'" >= "'2.1'")}') -eq 1 ]]; then
 			if [[ $(awk 'BEGIN {print ("'$framework_version'" >= "'2.1'")}') -eq 1 ]] && [[ $(awk 'BEGIN {print ("'$framework_version'" < "'3.1'")}') -eq 1 ]]; then
