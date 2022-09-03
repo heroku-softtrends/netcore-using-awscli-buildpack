@@ -27,7 +27,7 @@ source "$BP_DIR/bin/util/awscli-install.sh"
 source "$BP_DIR/bin/util/apt_dpkg_install.sh"
 
 ### Install aws-cli
-awicli_install
+awscli_install
 
 ### export env
 export_env_dir "$ENV_DIR"
