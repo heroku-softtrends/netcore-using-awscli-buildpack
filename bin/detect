@@ -56,7 +56,6 @@ if [[ -f "$1/$project_name.csproj" ]]; then
 						https://github.com/dotnet/core/blob/master/release-notes/$framework_version/$framework_version-supported-os.md
 					EOF
 				fi
-			fi
 			elif [[ $(awk 'BEGIN {print ("'$framework_version'" >= "'6.0'")}') -eq 1 ]]; then
 				if [[ $(awk 'BEGIN {print ("'$herokuos_version'" >= "'20.04'")}') -eq 1 ]]; then
 					echo "ASP.NET Core" && exit 0
