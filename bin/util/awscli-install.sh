@@ -3,7 +3,6 @@
 # shellcheck source=util/common.sh
 source "$BP_DIR/bin/util/common.sh"
 
-
 function awicli_install(){
 	APT_CACHE_DIR="$CACHE_DIR/apt/cache"
 	APT_STATE_DIR="$CACHE_DIR/apt/state"
