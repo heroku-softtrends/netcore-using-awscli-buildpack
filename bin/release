@@ -1,34 +1,61 @@
+```bash
 #!/usr/bin/env bash
 # bin/release <build-dir>
 
-### Configure directories
+set -o errexit
+set -o pipefail
+set -o nounset
 
-export BUILD_DIR=$1
-BP_DIR=$(cd $(dirname $0)/..; pwd)
+### Configure directories
+BUILD_DIR="${1:-}"
+
+if [[ -z "$BUILD_DIR" || ! -d "$BUILD_DIR" ]]; then
+    echo "ERROR: Usage: $0 <build-dir>" >&2
+    exit 1
+fi
+
+export BUILD_DIR
+BP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 ### Load dependencies
-
 # shellcheck source=util/common.sh
 source "$BP_DIR/bin/util/common.sh"
 
-### Export all env vars here
-. $BUILD_DIR/.profile.d/dotnetcore.sh
+### Load .NET runtime environment
+PROFILE_PATH="$BUILD_DIR/.profile.d/dotnetcore.sh"
 
+if [[ ! -f "$PROFILE_PATH" ]]; then
+    echo "ERROR: Runtime profile not found: $PROFILE_PATH" >&2
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "$PROFILE_PATH"
+
+### Validate required runtime variables
+if [[ -z "${APP_ASSEMBLY:-}" ]]; then
+    echo "ERROR: APP_ASSEMBLY is not configured." >&2
+    exit 1
+fi
+
+if [[ -z "${RELEASE_DIR:-}" ]]; then
+    echo "ERROR: RELEASE_DIR is not configured." >&2
+    exit 1
+fi
+
+### Generate release metadata
 cat <<EOF
 ---
 config_vars:
 EOF
 
-#if [[ $IS_POSTGRES_USED == "yes" ]]; then
-#cat <<EOF
-#addons:
-#  - heroku-postgresql:hobby-dev
-#EOF
-#fi
-
-if [[ ! -f $BUILD_DIR/Procfile ]]; then
-cat <<EOF
+### Configure default process type if Procfile is missing
+if [[ ! -f "$BUILD_DIR/Procfile" ]]; then
+    cat <<EOF
 default_process_types:
 EOF
-echo "  web: cd \$HOME/${APP_ASSEMBLY} && ASPNETCORE_URLS='http://+:\$PORT' dotnet \"./${APP_ASSEMBLY}.dll\" --urls http://+:\$PORT"
+
+    printf '  web: cd "$HOME/%s" && dotnet "./%s.dll" --urls "http://+:${PORT:-\${PORT}}" \n' \
+        "$RELEASE_DIR" "$APP_ASSEMBLY"
 fi
+```

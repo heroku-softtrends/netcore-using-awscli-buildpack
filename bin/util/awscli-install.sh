@@ -1,40 +1,76 @@
+```bash
 #!/usr/bin/env bash
 
 # shellcheck source=util/common.sh
 source "$BP_DIR/bin/util/common.sh"
 
-function awscli_install(){
-APT_CACHE_DIR="$CACHE_DIR/apt/cache"
-APT_STATE_DIR="$CACHE_DIR/apt/state"
-mkdir -p "$APT_CACHE_DIR/archives/partial"
-mkdir -p "$APT_STATE_DIR/lists/partial"
-APT_OPTIONS="-o debug::nolocking=true -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
-print "Updating apt caches"
-apt-get $APT_OPTIONS update | indent
+function awscli_install() {
+    local AWS_INSTALL_DIR="$BUILD_DIR/vendor/awscli"
+    local AWS_BIN_DIR="$AWS_INSTALL_DIR/bin"
+    local AWS_ARCHIVE="/tmp/awscliv2.zip"
 
-print "AWS cli install"
-print "Fetching AWS CLI into slug"
-#curl --progress-bar -o /tmp/awscli-bundle.zip "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip"
-curl --progress-bar -o /tmp/awscliv2.zip "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
-unzip -qq -d "$BUILD_DIR/vendor" /tmp/awscliv2.zip
+    print "Fetching AWS CLI v2"
 
-print "adding installer script into app/.profile.d"
-mkdir -p ${BUILD_DIR}/.profile.d
-cp $BP_DIR/profile/* $BUILD_DIR/.profile.d/
-cat <<EOF >${BUILD_DIR}/.profile.d/install_awscli.sh
-chmod +x /app/vendor/aws/install
-/app/vendor/aws/install -i /app/vendor/awscli -b /app/vendor/awscli/bin
-chmod u+x /app/vendor/awscli/bin/aws
-mkdir -p ~/.aws
-touch ~/.aws/credentials
-touch ~/.aws/config
-chmod +w ~/.aws/credentials
-chmod +w ~/.aws/config
-/app/vendor/awscli/bin/aws --version
+    mkdir -p "$BUILD_DIR/vendor"
+
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "ERROR: curl is required to download AWS CLI."
+        return 1
+    fi
+
+    if ! command -v unzip >/dev/null 2>&1; then
+        echo "ERROR: unzip is required to install AWS CLI."
+        return 1
+    fi
+
+    if ! curl -fsSL \
+        "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" \
+        -o "$AWS_ARCHIVE"; then
+        echo "ERROR: Failed to download AWS CLI."
+        return 1
+    fi
+
+    rm -rf "$BUILD_DIR/vendor/aws"
+
+    if ! unzip -qq -d "$BUILD_DIR/vendor" "$AWS_ARCHIVE"; then
+        echo "ERROR: Failed to extract AWS CLI installer."
+        rm -f "$AWS_ARCHIVE"
+        return 1
+    fi
+
+    print "Installing AWS CLI into slug"
+
+    if ! "$BUILD_DIR/vendor/aws/install" \
+        --install-dir "$AWS_INSTALL_DIR" \
+        --bin-dir "$AWS_BIN_DIR" \
+        --update; then
+        echo "ERROR: AWS CLI installation failed."
+        rm -f "$AWS_ARCHIVE"
+        return 1
+    fi
+
+    rm -rf "$BUILD_DIR/vendor/aws"
+    rm -f "$AWS_ARCHIVE"
+
+    if [[ ! -x "$AWS_BIN_DIR/aws" ]]; then
+        echo "ERROR: AWS CLI executable was not created at $AWS_BIN_DIR/aws"
+        return 1
+    fi
+
+    # Make AWS CLI available during the build.
+    export PATH="$AWS_BIN_DIR:$PATH"
+
+    print "AWS CLI installation completed"
+    "$AWS_BIN_DIR/aws" --version
+
+    # Add AWS CLI to the runtime environment.
+    mkdir -p "$BUILD_DIR/.profile.d"
+
+    cat > "$BUILD_DIR/.profile.d/awscli.sh" <<'EOF'
+#!/usr/bin/env bash
+export PATH="/app/vendor/awscli/bin:$PATH"
 EOF
-chmod +x $BUILD_DIR/.profile.d/install_awscli.sh
 
-#cleaning up
-rm -rf /tmp/awscli*
-print "aws cli installation done"
+    chmod +x "$BUILD_DIR/.profile.d/awscli.sh"
 }
+```
