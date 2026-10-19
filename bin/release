@@ -1,61 +1,50 @@
-```bash
-#!/usr/bin/env bash
-# bin/release <build-dir>
 
-set -o errexit
-set -o pipefail
-set -o nounset
+#!/usr/bin/env bash
+
+set -eu
 
 ### Configure directories
 BUILD_DIR="${1:-}"
 
-if [[ -z "$BUILD_DIR" || ! -d "$BUILD_DIR" ]]; then
-    echo "ERROR: Usage: $0 <build-dir>" >&2
+if [ -z "$BUILD_DIR" ] || [ ! -d "$BUILD_DIR" ]; then
+    echo "ERROR: Usage: bin/release <build-dir>" >&2
     exit 1
 fi
 
-export BUILD_DIR
 BP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 ### Load dependencies
 # shellcheck source=util/common.sh
 source "$BP_DIR/bin/util/common.sh"
 
-### Load .NET runtime environment
-PROFILE_PATH="$BUILD_DIR/.profile.d/dotnetcore.sh"
-
-if [[ ! -f "$PROFILE_PATH" ]]; then
-    echo "ERROR: Runtime profile not found: $PROFILE_PATH" >&2
-    exit 1
+### Load runtime environment
+if [ -f "$BUILD_DIR/.profile.d/dotnetcore.sh" ]; then
+    # shellcheck disable=SC1090
+    source "$BUILD_DIR/.profile.d/dotnetcore.sh"
 fi
 
-# shellcheck source=/dev/null
-source "$PROFILE_PATH"
+### Read application configuration
+APP_ASSEMBLY="${APP_ASSEMBLY:-}"
+RELEASE_DIR="${RELEASE_DIR:-}"
 
-### Validate required runtime variables
-if [[ -z "${APP_ASSEMBLY:-}" ]]; then
-    echo "ERROR: APP_ASSEMBLY is not configured." >&2
-    exit 1
+if [ -z "$APP_ASSEMBLY" ]; then
+    APP_ASSEMBLY="$(get_project_name "$BUILD_DIR")"
 fi
 
-if [[ -z "${RELEASE_DIR:-}" ]]; then
-    echo "ERROR: RELEASE_DIR is not configured." >&2
+if [ -z "$RELEASE_DIR" ]; then
+    RELEASE_DIR="${APP_ASSEMBLY}_Release"
+fi
+
+if [ -z "$APP_ASSEMBLY" ]; then
+    echo "ERROR: Could not determine application assembly name." >&2
     exit 1
 fi
 
 ### Generate release metadata
-cat <<EOF
----
-config_vars:
-EOF
+printf '%s\n' '---' 'config_vars:'
 
-### Configure default process type if Procfile is missing
-if [[ ! -f "$BUILD_DIR/Procfile" ]]; then
-    cat <<EOF
-default_process_types:
-EOF
-
-    printf '  web: cd "$HOME/%s" && dotnet "./%s.dll" --urls "http://+:${PORT:-\${PORT}}" \n' \
+if [ ! -f "$BUILD_DIR/Procfile" ]; then
+    printf '%s\n' 'default_process_types:'
+    printf '  web: cd "$HOME/%s" && dotnet "./%s.dll" --urls "http://+:$PORT"\n' \
         "$RELEASE_DIR" "$APP_ASSEMBLY"
 fi
-```
