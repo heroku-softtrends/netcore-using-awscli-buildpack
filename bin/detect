@@ -1,4 +1,4 @@
-```bash
+
 #!/usr/bin/env bash
 
 set -o errexit
@@ -13,9 +13,8 @@ if [[ -z "$BUILD_DIR" || ! -d "$BUILD_DIR" ]]; then
     exit 1
 fi
 
-### Detect solution or project
+### Detect solution file (optional)
 SOLUTION_FILE=""
-PROJECT_FILE=""
 
 while IFS= read -r -d '' file; do
     SOLUTION_FILE="$file"
@@ -25,21 +24,29 @@ done < <(
         \( -name "*.sln" -o -name "*.slnx" \) -print0
 )
 
-if [[ -z "$SOLUTION_FILE" ]]; then
-    while IFS= read -r -d '' file; do
-        PROJECT_FILE="$file"
-        break
-    done < <(
-        find "$BUILD_DIR" -maxdepth 2 -type f \
-            -name "*.csproj" -print0
-    )
+### Detect project file (mandatory)
+PROJECT_FILE=""
+
+while IFS= read -r -d '' file; do
+    PROJECT_FILE="$file"
+    break
+done < <(
+    find "$BUILD_DIR" -maxdepth 2 -type f \
+        -name "*.csproj" -print0
+)
+
+### Validate detection
+if [[ -z "$PROJECT_FILE" ]]; then
+    echo "ASP.NET Core buildpack: no .csproj found." >&2
+    exit 1
 fi
 
-if [[ -n "$SOLUTION_FILE" || -n "$PROJECT_FILE" ]]; then
+### Prefer solution when available
+if [[ -n "$SOLUTION_FILE" ]]; then
     echo "ASP.NET Core"
     exit 0
 fi
 
-echo "ASP.NET Core buildpack: no .sln, .slnx, or .csproj found." >&2
-exit 1
-```
+### Otherwise, use the project file
+echo "ASP.NET Core"
+exit 0
