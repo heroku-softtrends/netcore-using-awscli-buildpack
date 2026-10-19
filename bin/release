@@ -1,5 +1,6 @@
 
-#!/usr/bin/env bash
+#!/bin/sh
+# bin/release <build-dir>
 
 set -eu
 
@@ -11,16 +12,13 @@ if [ -z "$BUILD_DIR" ] || [ ! -d "$BUILD_DIR" ]; then
     exit 1
 fi
 
-BP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-### Load dependencies
-# shellcheck source=util/common.sh
-source "$BP_DIR/bin/util/common.sh"
+export BUILD_DIR
 
 ### Load runtime environment
-if [ -f "$BUILD_DIR/.profile.d/dotnetcore.sh" ]; then
-    # shellcheck disable=SC1090
-    source "$BUILD_DIR/.profile.d/dotnetcore.sh"
+PROFILE_FILE="$BUILD_DIR/.profile.d/dotnetcore.sh"
+
+if [ -f "$PROFILE_FILE" ]; then
+    . "$PROFILE_FILE"
 fi
 
 ### Read application configuration
@@ -28,15 +26,12 @@ APP_ASSEMBLY="${APP_ASSEMBLY:-}"
 RELEASE_DIR="${RELEASE_DIR:-}"
 
 if [ -z "$APP_ASSEMBLY" ]; then
-    APP_ASSEMBLY="$(get_project_name "$BUILD_DIR")"
+    echo "ERROR: APP_ASSEMBLY is not defined in dotnetcore.sh." >&2
+    exit 1
 fi
 
 if [ -z "$RELEASE_DIR" ]; then
-    RELEASE_DIR="${APP_ASSEMBLY}_Release"
-fi
-
-if [ -z "$APP_ASSEMBLY" ]; then
-    echo "ERROR: Could not determine application assembly name." >&2
+    echo "ERROR: RELEASE_DIR is not defined in dotnetcore.sh." >&2
     exit 1
 fi
 
