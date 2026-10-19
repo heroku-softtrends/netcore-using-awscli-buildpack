@@ -1,4 +1,4 @@
-```bash
+
 #!/usr/bin/env bash
 # bin/compile <build-dir> <cache-dir> <env-dir>
 
@@ -8,7 +8,6 @@ set -o nounset
 unset GIT_DIR
 
 ### Configure directories
-BASE_DIR="$(pwd)"
 BUILD_DIR="${1:-}"
 CACHE_DIR="${2:-}"
 ENV_DIR="${3:-}"
@@ -22,21 +21,26 @@ fi
 ### Load dependencies
 # shellcheck source=util/common.sh
 source "$BP_DIR/bin/util/common.sh"
+
 # shellcheck source=util/awscli-install.sh
 source "$BP_DIR/bin/util/awscli-install.sh"
+
 # shellcheck source=util/apt_dpkg_install.sh
 source "$BP_DIR/bin/util/apt_dpkg_install.sh"
 
 ### Install AWS CLI
-awscli_install
+if ! awscli_install; then
+    echo "ERROR: AWS CLI installation failed." >&2
+    exit 1
+fi
 
 ### Export environment
 export_env_dir "$ENV_DIR"
 
 ### Verify AWS CLI is available during compilation
 if ! command -v aws >/dev/null 2>&1; then
-    echo "ERROR: AWS CLI is not available in PATH after installation."
-    echo "PATH: $PATH"
+    echo "ERROR: AWS CLI is not available in PATH after installation." >&2
+    echo "PATH: $PATH" >&2
     exit 1
 fi
 
@@ -258,4 +262,3 @@ EOF
 fi
 
 print ".NET buildpack compilation completed successfully."
-```
