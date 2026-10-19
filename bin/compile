@@ -124,7 +124,7 @@ print "SDK version: ${runtime_framework_version:-not specified}"
 DOTNET_DIR="$BUILD_DIR/.dotnet"
 mkdir -p "$DOTNET_DIR"
 
-if [[ -n "$runtime_framework_version" ]]; then
+if [[ -n "$runtime_framework_version" && "$runtime_framework_version" != "Latest" ]]; then
     "$BP_DIR/bin/util/dotnet-install.sh" \
         --architecture x64 \
         --version "$runtime_framework_version" \
