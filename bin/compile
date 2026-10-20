@@ -34,6 +34,14 @@ if ! awscli_install; then
     exit 1
 fi
 
+# Verify AWS CLI
+if ! command -v aws >/dev/null 2>&1; then
+    echo "ERROR: AWS CLI is not available in compile PATH." >&2
+    exit 1
+fi
+
+aws --version
+
 ### Export environment
 export_env_dir "$ENV_DIR"
 
@@ -58,24 +66,31 @@ print "OS: Ubuntu ${herokuos_version}"
 print "Stack version: ${STACK:-unknown}"
 print "Installing prerequisites for .NET on Ubuntu"
 
+# Install common packages
+apt_install ca-certificates libc6 libgssapi-krb5-2 libstdc++6 zlib1g
+
+# Install Ubuntu-version-specific packages
 case "$herokuos_version" in
     "16.04")
-        apt_install ca-certificates libc6 libgcc1 libgssapi-krb5-2 libicu55 libssl1.0.0 libstdc++6 zlib1g
+        apt_install libgcc1 libicu55 libssl1.0.0
         ;;
     "18.04")
-        apt_install ca-certificates libc6 libgcc1 libgssapi-krb5-2 libicu60 libssl1.1 libstdc++6 zlib1g
+        apt_install libgcc1 libicu60 libssl1.1
         ;;
     "19.04")
-        apt_install ca-certificates libc6 libgcc-s1 libgssapi-krb5-2 libicu63 libssl1.1 libstdc++6 zlib1g
+        apt_install libgcc-s1 libicu63 libssl1.1
         ;;
     "20.04")
-        apt_install apt-transport-https ca-certificates libc6 libgcc-s1 libgssapi-krb5-2 libicu66 libssl1.1 libstdc++6 zlib1g
+        apt_install apt-transport-https libgcc-s1 libicu66 libssl1.1
         ;;
     "22.04")
-        apt_install apt-transport-https ca-certificates libc6 libgcc-s1 libgssapi-krb5-2 libicu70 libssl3 libstdc++6 libunwind8 zlib1g
+        apt_install apt-transport-https libgcc-s1 libicu70 libssl3 libunwind8
         ;;
     "24.04")
-        apt_install ca-certificates libc6 libgcc-s1 libgssapi-krb5-2 libicu74 libssl3 libstdc++6 zlib1g
+        apt_install libgcc-s1 libicu74 libssl3
+        ;;
+    "25.04")
+        apt_install libgcc-s1 libicu76 libssl3t64
         ;;
     *)
         print "ERROR: Unsupported Ubuntu version: ${herokuos_version}"

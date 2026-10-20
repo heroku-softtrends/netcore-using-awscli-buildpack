@@ -7,6 +7,7 @@ source "$BP_DIR/bin/util/common.sh"
 awscli_install() {
     local AWS_INSTALL_DIR="$BUILD_DIR/vendor/awscli"
     local AWS_BIN_DIR="$AWS_INSTALL_DIR/bin"
+    local AWS_CLI_TARGET="$AWS_INSTALL_DIR/v2/current/bin/aws"
     local AWS_ARCHIVE="/tmp/awscliv2.zip"
     local AWS_URL
 
@@ -51,7 +52,7 @@ awscli_install() {
 
     if ! unzip -qq -d "$BUILD_DIR/vendor" "$AWS_ARCHIVE"; then
         echo "ERROR: Failed to extract AWS CLI installer." >&2
-        rm -f "$AWS_ARCHIVE"
+        rm -rf "$BUILD_DIR/vendor/aws" "$AWS_ARCHIVE"
         return 1
     fi
 
@@ -62,26 +63,40 @@ awscli_install() {
         --bin-dir "$AWS_BIN_DIR" \
         --update; then
         echo "ERROR: AWS CLI installation failed." >&2
-        rm -rf "$BUILD_DIR/vendor/aws"
-        rm -f "$AWS_ARCHIVE"
+        rm -rf "$BUILD_DIR/vendor/aws" "$AWS_ARCHIVE"
         return 1
     fi
 
+    # Ensure the installed CLI target exists.
+    if [[ ! -x "$AWS_CLI_TARGET" ]]; then
+        echo "ERROR: AWS CLI target not found: $AWS_CLI_TARGET" >&2
+        rm -rf "$BUILD_DIR/vendor/aws" "$AWS_ARCHIVE"
+        return 1
+    fi
+
+    # Replace the build-time absolute link with a runtime-safe relative link.
+    rm -f "$AWS_BIN_DIR/aws"
+
+    if ! ln -s ../v2/current/bin/aws "$AWS_BIN_DIR/aws"; then
+        echo "ERROR: Failed to create AWS CLI symlink." >&2
+        rm -rf "$BUILD_DIR/vendor/aws" "$AWS_ARCHIVE"
+        return 1
+    fi
+
+    # Verify AWS CLI while the build environment is available.
+    if ! "$AWS_BIN_DIR/aws" --version; then
+        echo "ERROR: AWS CLI cannot run after installation." >&2
+        rm -rf "$BUILD_DIR/vendor/aws" "$AWS_ARCHIVE"
+        return 1
+    fi
+
+    # Remove installer files; retain the installed AWS CLI.
     rm -rf "$BUILD_DIR/vendor/aws"
     rm -f "$AWS_ARCHIVE"
 
-    if [[ ! -x "$AWS_BIN_DIR/aws" ]]; then
-        echo "ERROR: AWS CLI executable was not created at $AWS_BIN_DIR/aws" >&2
-        return 1
-    fi
-
-    # Make AWS CLI available during compilation.
-    export PATH="$AWS_BIN_DIR:$PATH"
-
     print "AWS CLI installation completed"
-    "$AWS_BIN_DIR/aws" --version
 
-    # Make AWS CLI available at runtime.
+    # Configure AWS CLI PATH for runtime.
     mkdir -p "$BUILD_DIR/.profile.d"
 
     cat > "$BUILD_DIR/.profile.d/awscli.sh" <<'EOF'
