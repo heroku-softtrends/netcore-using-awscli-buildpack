@@ -1,7 +1,5 @@
-
 #!/usr/bin/env bash
 
-# shellcheck source=util/common.sh
 source "$BP_DIR/bin/util/common.sh"
 
 awscli_install() {
@@ -67,14 +65,30 @@ awscli_install() {
         return 1
     fi
 
-    # Ensure the installed CLI target exists.
     if [[ ! -x "$AWS_CLI_TARGET" ]]; then
         echo "ERROR: AWS CLI target not found: $AWS_CLI_TARGET" >&2
         rm -rf "$BUILD_DIR/vendor/aws" "$AWS_ARCHIVE"
         return 1
     fi
 
-    # Replace the build-time absolute link with a runtime-safe relative link.
+    local VERSION_DIR
+    VERSION_DIR="$(find "$AWS_INSTALL_DIR/v2" \
+        -mindepth 1 -maxdepth 1 -type d ! -name current \
+        -print -quit)"
+
+    if [[ -z "$VERSION_DIR" ]]; then
+        echo "ERROR: AWS CLI version directory not found." >&2
+        ls -la "$AWS_INSTALL_DIR/v2" >&2
+        rm -rf "$BUILD_DIR/vendor/aws" "$AWS_ARCHIVE"
+        return 1
+    fi
+
+    local VERSION_DIRNAME
+    VERSION_DIRNAME="$(basename "$VERSION_DIR")"
+
+    rm -f "$AWS_INSTALL_DIR/v2/current"
+    ln -s "$VERSION_DIRNAME" "$AWS_INSTALL_DIR/v2/current"
+
     rm -f "$AWS_BIN_DIR/aws"
 
     if ! ln -s ../v2/current/bin/aws "$AWS_BIN_DIR/aws"; then
@@ -83,26 +97,16 @@ awscli_install() {
         return 1
     fi
 
-    # Verify AWS CLI while the build environment is available.
     if ! "$AWS_BIN_DIR/aws" --version; then
         echo "ERROR: AWS CLI cannot run after installation." >&2
         rm -rf "$BUILD_DIR/vendor/aws" "$AWS_ARCHIVE"
         return 1
     fi
 
-    # Remove installer files; retain the installed AWS CLI.
     rm -rf "$BUILD_DIR/vendor/aws"
     rm -f "$AWS_ARCHIVE"
 
+    export PATH="$AWS_BIN_DIR:$PATH"
+
     print "AWS CLI installation completed"
-
-    # Configure AWS CLI PATH for runtime.
-    mkdir -p "$BUILD_DIR/.profile.d"
-
-    cat > "$BUILD_DIR/.profile.d/awscli.sh" <<'EOF'
-#!/usr/bin/env bash
-export PATH="/app/vendor/awscli/bin:$PATH"
-EOF
-
-    chmod +x "$BUILD_DIR/.profile.d/awscli.sh"
 }
